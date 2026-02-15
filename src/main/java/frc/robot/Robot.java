@@ -2,6 +2,8 @@ package frc.robot;
 
 import com.ctre.phoenix6.SignalLogger;
 
+import edu.wpi.first.cameraserver.CameraServer;
+import edu.wpi.first.cscore.UsbCamera;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -13,6 +15,14 @@ public class Robot extends TimedRobot {
   @Override
   public void robotInit() {
     m_robotContainer = new RobotContainer();
+
+    UsbCamera frontCamera = CameraServer.startAutomaticCapture("Front Camera", 0);
+    frontCamera.setResolution(320, 240);
+    frontCamera.setFPS(15);
+    UsbCamera backCamera = CameraServer.startAutomaticCapture("Back Camera", 1);
+    backCamera.setResolution(320, 240);
+    backCamera.setFPS(15);
+
     SignalLogger.start();
     System.out.println("Phoenix Pro Signal Logging Started - Logs will be saved to ./logs/swerve.hoot");
   }

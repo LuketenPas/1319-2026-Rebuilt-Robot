@@ -10,6 +10,8 @@ import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
+import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.commands.FollowPathCommand;
 
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -25,7 +27,6 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.limelight.LimelightSubsystem;
 import frc.robot.subsystems.shooter.FlyWheelSubsystem;
-import frc.robot.subsystems.shooter.HoodSubsystem;
 import frc.robot.subsystems.shooter.UptakeSubsystem;
 
 public class RobotContainer {
@@ -57,7 +58,6 @@ public class RobotContainer {
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
     public final LimelightSubsystem limelightSubsystem = new LimelightSubsystem();
     public final FlyWheelSubsystem flyWheelSubsystem = new FlyWheelSubsystem();
-    public final HoodSubsystem hoodSubsystem = new HoodSubsystem();
     public final UptakeSubsystem uptakeSubsystem = new UptakeSubsystem();
 
     //Path follower - NOT final so we can initialize it in constructor
@@ -66,15 +66,41 @@ public class RobotContainer {
     public RobotContainer() {
         limelightSubsystem.setDrivetrain(drivetrain);
         
+        NamedCommands.registerCommand("Shoot", 
+            Commands.sequence(
+                flyWheelSubsystem.shootCommand(),
+                flyWheelSubsystem.waitUntilAtSpeed(),      
+                uptakeSubsystem.runCommand(),           
+                Commands.waitSeconds(5),             
+                Commands.parallel(                           
+                    flyWheelSubsystem.stopCommand(),
+                    uptakeSubsystem.stopCommand()
+                )
+            )
+        );
+
+        NamedCommands.registerCommand("AlignToTarget",
+            Commands.run(() -> {
+                if (limelightSubsystem.hasValidTarget()) {
+                    double rotationalRate = limelightSubsystem.calculateAimVelocity(MaxAngularRate);
+                    drivetrain.setControl(
+                        new SwerveRequest.RobotCentric()
+                            .withVelocityX(0)
+                            .withVelocityY(0)
+                            .withRotationalRate(rotationalRate)
+                    );
+            }
+            }, drivetrain, limelightSubsystem)
+            .withTimeout(1.0)
+        );
+
+        autoChooser = AutoBuilder.buildAutoChooser();
         SmartDashboard.putData("Auto Mode", autoChooser);
 
         configureBindings();
 
         // Warmup PathPlanner to avoid Java pauses
         FollowPathCommand.warmupCommand().schedule();
-
-        // Home the hood on robot startup
-        hoodSubsystem.homeCommand().schedule();
     }
 
     private void configureBindings() {
@@ -162,22 +188,6 @@ public class RobotContainer {
                 uptakeSubsystem.stopCommand()
             )
         );
-
-        // Hood manual control
-        hoodSubsystem.setDefaultCommand(
-            hoodSubsystem.manualControlCommand(() -> -operatorController.getLeftY() * 0.1)
-        );
-
-        // Hood preset positions (quick overrides during match)
-        operatorController.povUp().onTrue(hoodSubsystem.farShotCommand());     // Far shot preset
-        operatorController.povLeft().onTrue(hoodSubsystem.closeShotCommand()); // Close shot preset
-        operatorController.povDown().onTrue(hoodSubsystem.stowCommand());      // Stow position
-
-        // Manual hood home 
-        operatorController.back().onTrue(hoodSubsystem.homeCommand());
-
-        // Manual position reset
-        operatorController.start().onTrue(hoodSubsystem.resetPositionCommand());
     }
 
     public Command getAutonomousCommand() {
