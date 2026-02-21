@@ -25,6 +25,7 @@ import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.limelight.LimelightSubsystem;
 import frc.robot.subsystems.shooter.FlyWheelSubsystem;
 import frc.robot.subsystems.shooter.UptakeSubsystem;
+import frc.robot.subsystems.ClimberSubsystem;
 
 public class RobotContainer {
     // Max speeds
@@ -61,7 +62,7 @@ public class RobotContainer {
     public final LimelightSubsystem      limelightSubsystem = new LimelightSubsystem();
     public final FlyWheelSubsystem       flyWheelSubsystem  = new FlyWheelSubsystem();
     public final UptakeSubsystem         uptakeSubsystem    = new UptakeSubsystem();
-
+    public final ClimberSubsystem        climberSubsystem   = new ClimberSubsystem();
     // Telemetry
     private final Telemetry m_telemetry = new Telemetry(kMaxSpeed);
 
@@ -162,6 +163,9 @@ public class RobotContainer {
                 uptakeSubsystem.stopCommand()
             )
         );
+
+        m_operatorController.start()
+            .onTrue(climberSubsystem.ClimberToggle(climberSubsystem));
 
         // Operator left trigger — auto-align and shoot
         m_operatorController.leftTrigger().whileTrue(
