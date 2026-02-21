@@ -3,243 +3,215 @@ package frc.robot.subsystems.limelight;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
+import frc.robot.subsystems.limelight.LimelightHelpers.RawFiducial;
 
+/**
+ * Manages Limelight vision, MegaTag2 odometry fusion, distance measurement,
+ * and AprilTag alignment assist.
+ */
 public class LimelightSubsystem extends SubsystemBase {
-    private static final String LIMELIGHT_NAME = "limelight";
-    
-    // Proportional control constant
-    private static final double kP_AIM = 0.035;
-    
-    // Distance Calculation Constants
-    private static final double LIMELIGHT_HEIGHT_METERS = 0.5;
-    private static final double TARGET_HEIGHT_METERS = 1.5;
-    private static final double LIMELIGHT_MOUNT_ANGLE_DEGREES = 30.0;
-    
-    // PRO FEATURE: Vision measurement configuration
-    private static final int MIN_TAGS_FOR_VISION_UPDATE = 1;  // Lowered to 1 for auto (was 2)
-    private static final double MAX_DISTANCE_FOR_VISION_UPDATE = 5.0;  // Max distance in meters
-    
-    // PRO FEATURE: Separate standards for auto vs teleop
-    private static final int MIN_TAGS_FOR_AUTO = 2;  // Higher confidence needed in auto
-    private static final double MAX_DISTANCE_FOR_AUTO = 4.0;  // Closer range in auto
-    
-    private CommandSwerveDrivetrain m_drivetrain = null;
-    private boolean m_visionUpdatesEnabled = true;  // Can disable if needed
-    private boolean m_isAutoMode = false;  // Track if we're in autonomous
-    
+    private static final String kLimelightName = "limelight";
+
+    // Proportional gain for rotation-to-target alignment
+    private static final double kPAim = 0.035;
+
+    // Vision fusion thresholds — teleop
+    private static final int    kMinTagsTeleop     = 1;
+    private static final double kMaxDistanceTeleop = 5.0;
+
+    // Vision fusion thresholds — autonomous (stricter)
+    private static final int    kMinTagsAuto     = 2;
+    private static final double kMaxDistanceAuto = 4.0;
+
+    private CommandSwerveDrivetrain m_drivetrain;
+    private boolean m_visionUpdatesEnabled = true;
+    private boolean m_isAutoMode           = false;
+
     public LimelightSubsystem() {
-        LimelightHelpers.setLEDMode_ForceOff(LIMELIGHT_NAME);
+        LimelightHelpers.setLEDMode_ForceOff(kLimelightName);
     }
-    
-    /**
-     * PRO FEATURE: Set the drivetrain reference for vision measurement integration
-     */
+
+    // ========== Configuration ==========
+
+    /** Provides the drivetrain reference required for MegaTag2 odometry fusion. */
     public void setDrivetrain(CommandSwerveDrivetrain drivetrain) {
         m_drivetrain = drivetrain;
     }
-    
-    /**
-     * Enable or disable vision odometry updates
-     * Useful for debugging or if vision is unreliable
-     */
+
+    /** Enables or disables vision odometry updates. */
     public void setVisionUpdatesEnabled(boolean enabled) {
         m_visionUpdatesEnabled = enabled;
-        System.out.println("Vision updates " + (enabled ? "ENABLED" : "DISABLED"));
     }
-    
+
     /**
-     * Tell the subsystem we're in autonomous mode
-     * This uses stricter vision measurement criteria
+     * Switches between auto and teleop vision criteria.
+     * Auto mode uses stricter tag count and distance thresholds.
      */
     public void setAutoMode(boolean isAuto) {
         m_isAutoMode = isAuto;
         if (isAuto) {
-            // Turn LEDs on during auto for better AprilTag detection
             setLEDsOn();
-            System.out.println("Limelight: AUTO MODE - Using strict vision criteria");
         } else {
             setLEDsOff();
-            System.out.println("Limelight: TELEOP MODE - Using standard vision criteria");
         }
     }
-    
+
+    // ========== Limelight Readings ==========
+
+    /** Returns horizontal offset from crosshair to target in degrees. Positive = target is right. */
     public double getHorizontalOffset() {
-        return LimelightHelpers.getTX(LIMELIGHT_NAME);
+        return LimelightHelpers.getTX(kLimelightName);
     }
-    
+
+    /** Returns vertical offset from crosshair to target in degrees. */
     public double getVerticalOffset() {
-        return LimelightHelpers.getTY(LIMELIGHT_NAME);
+        return LimelightHelpers.getTY(kLimelightName);
     }
-    
-    public double getTargetArea() {
-        return LimelightHelpers.getTA(LIMELIGHT_NAME);
-    }
-    
+
+    /** Returns true if the Limelight has a valid target lock. */
     public boolean hasValidTarget() {
-        return LimelightHelpers.getTV(LIMELIGHT_NAME);
+        return LimelightHelpers.getTV(kLimelightName);
     }
-    
+
+    // ========== Distance Calculation ==========
+
+    /**
+    * Returns distance from the robot to the primary AprilTag in meters.
+    * Uses the Limelight's 3D fiducial solve which is more accurate than
+    * the trigonometric estimate. Returns -1.0 if no target is visible.
+    */
+    public double getDistanceToTarget() {
+        RawFiducial[] fiducials = LimelightHelpers.getRawFiducials(kLimelightName);
+
+        if (fiducials.length == 0) {
+            return -1.0;
+        }
+
+        return fiducials[0].distToRobot;
+    }
+
+    /**
+     * Returns distance to target with bounds checking.
+     * Falls back to 3.0 m if the measurement is invalid.
+     */
+    public double getDistanceToTargetSafe() {
+        double distance = getDistanceToTarget();
+
+        if (distance < 0 || distance > 10.0 || Double.isNaN(distance) || Double.isInfinite(distance)) {
+            return 3.0;
+        }
+
+        return distance;
+    }
+
+    // ========== Alignment ==========
+
+    /**
+     * Calculates a rotational velocity for aligning to the current target.
+     * Returns 0 if no target is visible.
+     */
     public double calculateAimVelocity(double maxAngularRate) {
         if (!hasValidTarget()) {
             return 0.0;
         }
-        
-        double targetingAngularVelocity = getHorizontalOffset() * kP_AIM;
-        targetingAngularVelocity *= maxAngularRate;
-        targetingAngularVelocity *= -1.0;
-        return targetingAngularVelocity;
+
+        return -getHorizontalOffset() * kPAim * maxAngularRate;
     }
-    
-    public double getDistanceToTarget() {
-        if (!hasValidTarget()) {
-            return -1.0;
-        }
-        
-        double ty = getVerticalOffset();
-        double angleToTargetDegrees = LIMELIGHT_MOUNT_ANGLE_DEGREES + ty;
-        double angleToTargetRadians = Math.toRadians(angleToTargetDegrees);
-        double heightDifference = TARGET_HEIGHT_METERS - LIMELIGHT_HEIGHT_METERS;
-        double distance = heightDifference / Math.tan(angleToTargetRadians);
-        
-        return distance;
-    }
-    
-    public double getDistanceToTargetSafe() {
-        double distance = getDistanceToTarget();
-        
-        if (distance < 0 || distance > 10.0 || Double.isNaN(distance) || Double.isInfinite(distance)) {
-            return 3.0;
-        }
-        
-        return distance;
-    }
-    
-    /**
-     * PRO FEATURE: Get MegaTag2 pose estimate for vision measurement integration
-     */
+
+    // ========== MegaTag2 Vision Fusion ==========
+
+    /** Returns the latest MegaTag2 pose estimate in the WPILib Blue alliance frame. */
     public LimelightHelpers.PoseEstimate getMegaTag2Estimate() {
-        return LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(LIMELIGHT_NAME);
+        return LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(kLimelightName);
     }
-    
-    /**
-     * PRO FEATURE: Process vision measurements and integrate with drivetrain odometry
-     * Now public so it can be called on-demand or monitored
-     */
-    public void processVisionMeasurements() {
+
+    /** Validates and applies a MegaTag2 pose estimate to the drivetrain Kalman filter. */
+    private void processVisionMeasurements() {
         if (m_drivetrain == null || !m_visionUpdatesEnabled) {
-            SmartDashboard.putBoolean("Limelight/VisionUpdateApplied", false);
             return;
         }
-        
-        // Get MegaTag2 pose estimate
+
         LimelightHelpers.PoseEstimate mt2 = getMegaTag2Estimate();
-        
-        // Validate the measurement before using it
+
         if (mt2 != null && isValidVisionMeasurement(mt2)) {
             double distance = getDistanceToTargetSafe();
-            
-            // Add vision measurement to drivetrain with dynamic standard deviations
             m_drivetrain.addVisionMeasurementWithDistance(
                 mt2.pose,
                 mt2.timestampSeconds,
                 distance,
                 mt2.tagCount
             );
-            
-            SmartDashboard.putBoolean("Limelight/VisionUpdateApplied", true);
-            SmartDashboard.putNumber("Limelight/LastUpdateTagCount", mt2.tagCount);
-            SmartDashboard.putNumber("Limelight/LastUpdateDistance", distance);
+            SmartDashboard.putBoolean("Vision/Active", true);
         } else {
-            SmartDashboard.putBoolean("Limelight/VisionUpdateApplied", false);
+            SmartDashboard.putBoolean("Vision/Active", false);
         }
     }
-    
-    /**
-     * PRO FEATURE: Validates vision measurement before applying to odometry
-     * Uses different criteria for auto vs teleop
-     */
+
+    /** Returns true if the pose estimate meets the current mode's quality thresholds. */
     private boolean isValidVisionMeasurement(LimelightHelpers.PoseEstimate estimate) {
-        // Use stricter criteria in auto mode
-        int minTags = m_isAutoMode ? MIN_TAGS_FOR_AUTO : MIN_TAGS_FOR_VISION_UPDATE;
-        double maxDistance = m_isAutoMode ? MAX_DISTANCE_FOR_AUTO : MAX_DISTANCE_FOR_VISION_UPDATE;
-        
-        // Must have minimum number of tags
+        int    minTags     = m_isAutoMode ? kMinTagsAuto     : kMinTagsTeleop;
+        double maxDistance = m_isAutoMode ? kMaxDistanceAuto : kMaxDistanceTeleop;
+
         if (estimate.tagCount < minTags) {
-            SmartDashboard.putString("Limelight/RejectReason", "Not enough tags (" + estimate.tagCount + " < " + minTags + ")");
             return false;
         }
-        
-        // Must be within reasonable distance
+
         double distance = getDistanceToTargetSafe();
-        if (distance > maxDistance) {
-            SmartDashboard.putString("Limelight/RejectReason", "Too far (" + String.format("%.2f", distance) + "m > " + maxDistance + "m)");
+        if (distance > maxDistance || estimate.avgTagDist > maxDistance) {
             return false;
         }
-        
-        // Pose must not be at origin (indicates invalid data)
+
+        // Reject origin pose which indicates uninitialized data
         if (estimate.pose.getX() == 0 && estimate.pose.getY() == 0) {
-            SmartDashboard.putString("Limelight/RejectReason", "Pose at origin (invalid)");
             return false;
         }
-        
-        // Average tag distance should be reasonable
-        if (estimate.avgTagDist > maxDistance) {
-            SmartDashboard.putString("Limelight/RejectReason", "Avg tag distance too far");
-            return false;
-        }
-        
-        SmartDashboard.putString("Limelight/RejectReason", "ACCEPTED");
+
         return true;
     }
-    
+
+    // ========== LED Control ==========
+
     public void setLEDsOn() {
-        LimelightHelpers.setLEDMode_ForceOn(LIMELIGHT_NAME);
+        LimelightHelpers.setLEDMode_ForceOn(kLimelightName);
     }
-    
+
     public void setLEDsOff() {
-        LimelightHelpers.setLEDMode_ForceOff(LIMELIGHT_NAME);
+        LimelightHelpers.setLEDMode_ForceOff(kLimelightName);
     }
-    
+
     public void setPipeline(int pipeline) {
-        LimelightHelpers.setPipelineIndex(LIMELIGHT_NAME, pipeline);
+        LimelightHelpers.setPipelineIndex(kLimelightName, pipeline);
     }
-    
+
+    // ========== Periodic ==========
+
     @Override
     public void periodic() {
         try {
-            boolean hasTarget = hasValidTarget();
-            double tx = getHorizontalOffset();
-            double ty = getVerticalOffset();
-            double ta = getTargetArea();
-            double distance = getDistanceToTarget();
-            double distanceSafe = getDistanceToTargetSafe();
-            
-            // Log telemetry to SmartDashboard
-            SmartDashboard.putBoolean("Limelight/HasTarget", hasTarget);
-            SmartDashboard.putNumber("Limelight/TX", tx);
-            SmartDashboard.putNumber("Limelight/TY", ty);
-            SmartDashboard.putNumber("Limelight/TA", ta);
-            SmartDashboard.putNumber("Limelight/Distance_Meters", distance);
-            SmartDashboard.putNumber("Limelight/Distance_Safe", distanceSafe);
-            SmartDashboard.putBoolean("Limelight/VisionEnabled", m_visionUpdatesEnabled);
-            SmartDashboard.putBoolean("Limelight/AutoMode", m_isAutoMode);
-            
-            // PRO FEATURE: Process vision measurements for odometry fusion
+            // MegaTag2 requires robot yaw to be sent every loop before requesting the estimate
+            if (m_drivetrain != null) {
+                double yawDegrees = m_drivetrain.getState().Pose.getRotation().getDegrees();
+                LimelightHelpers.SetRobotOrientation_NoFlush(
+                    kLimelightName,
+                    yawDegrees, 0,
+                    0, 0,
+                    0, 0
+                );
+            }
+
             processVisionMeasurements();
-            
-            // Log MegaTag2 info if available
+
+            // Essential driver-facing telemetry
+            SmartDashboard.putBoolean("Vision/HasTarget", hasValidTarget());
+            SmartDashboard.putNumber("Vision/HorizontalOffset", getHorizontalOffset());
+            SmartDashboard.putNumber("Vision/Distance", getDistanceToTarget());
+
             LimelightHelpers.PoseEstimate mt2 = getMegaTag2Estimate();
             if (mt2 != null) {
-                SmartDashboard.putNumber("Limelight/MegaTag2/TagCount", mt2.tagCount);
-                SmartDashboard.putNumber("Limelight/MegaTag2/AvgTagDist", mt2.avgTagDist);
-                SmartDashboard.putNumber("Limelight/MegaTag2/X", mt2.pose.getX());
-                SmartDashboard.putNumber("Limelight/MegaTag2/Y", mt2.pose.getY());
-                SmartDashboard.putNumber("Limelight/MegaTag2/Rotation", mt2.pose.getRotation().getDegrees());
+                SmartDashboard.putNumber("Vision/TagCount", mt2.tagCount);
             }
-            
         } catch (Exception e) {
-            // Silently catch any errors to prevent crash
-            System.err.println("Limelight periodic error: " + e.getMessage());
+            // Prevent a Limelight error from crashing the robot
         }
     }
 }

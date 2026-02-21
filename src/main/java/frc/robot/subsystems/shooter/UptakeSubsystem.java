@@ -1,7 +1,3 @@
-// Copyright (c) FIRST and other WPILib contributors.
-// Open Source Software; you can modify and/or share it under the terms of
-// the WPILib BSD license file in the root directory of this project.
-
 package frc.robot.subsystems.shooter;
 
 import com.ctre.phoenix6.controls.Follower;
@@ -12,63 +8,55 @@ import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
+/** Controls the uptake and roller motors that feed notes into the flywheel. */
 public class UptakeSubsystem extends SubsystemBase {
-  //Motor
-  private final TalonFX uptakeMotor;
-  private final TalonFX rollerMotor;
-  
-  //Constants
-  private static final int UPTAKE_MOTOR_ID = 9;
-  private static final int ROLLER_MOTOR_ID = 10;
-  private static final String CAN_BUS = "canivore";
-  private static final double UPTAKE_SPEED = 1.0;
+    private final TalonFX m_uptakeMotor;
+    private final TalonFX m_rollerMotor;
 
-  public UptakeSubsystem() {
-    uptakeMotor = new TalonFX(UPTAKE_MOTOR_ID, CAN_BUS);
-    rollerMotor = new TalonFX(ROLLER_MOTOR_ID, CAN_BUS);
-    
-    //Configure motor to brake when stopped
-    uptakeMotor.setNeutralMode(NeutralModeValue.Brake);
-    rollerMotor.setNeutralMode(NeutralModeValue.Coast);
+    private static final int    kUptakeMotorId = 9;
+    private static final int    kRollerMotorId = 10;
+    private static final String kCanBus        = "canivore";
+    private static final double kUptakeSpeed   = 1.0;
 
-    rollerMotor.setControl(new Follower(UPTAKE_MOTOR_ID, MotorAlignmentValue.Opposed));
-  }
+    public UptakeSubsystem() {
+        m_uptakeMotor = new TalonFX(kUptakeMotorId, kCanBus);
+        m_rollerMotor = new TalonFX(kRollerMotorId, kCanBus);
 
-  @Override
-  public void periodic() {
-  }
+        m_uptakeMotor.setNeutralMode(NeutralModeValue.Brake);
+        m_rollerMotor.setNeutralMode(NeutralModeValue.Coast);
 
-  // Private Helper Methods
-  
-  //Runs the uptake motor at specified speed
-  private void setUptakeSpeed(double speed) {
-    uptakeMotor.set(speed);
-  }
+        // Roller follows uptake in the opposite direction to feed toward the shooter
+        m_rollerMotor.setControl(new Follower(kUptakeMotorId, MotorAlignmentValue.Opposed));
+    }
 
-  //Stops the uptake motor
-  private void stop() {
-    uptakeMotor.set(0);
-  }
+    @Override
+    public void periodic() {}
 
-  //Public Commands
-  
-  //Command to run the uptake at default speed
-  public Command runCommand() {
-    return runOnce(() -> setUptakeSpeed(UPTAKE_SPEED));
-  }
+    private void setUptakeSpeed(double speed) {
+        m_uptakeMotor.set(speed);
+    }
 
-  //Command to stop the uptake
-  public Command stopCommand() {
-    return runOnce(() -> stop());
-  }
-  
-  //Command to run uptake at custom speed
-  public Command runAtSpeed(double speed) {
-    return runOnce(() -> setUptakeSpeed(speed));
-  }
-  
-  //Command to reverse the uptake (for unjamming)
-  public Command reverseCommand() {
-    return runOnce(() -> setUptakeSpeed(-UPTAKE_SPEED));
-  }
+    private void stop() {
+        m_uptakeMotor.set(0);
+    }
+
+    /** Runs the uptake at full speed. */
+    public Command runCommand() {
+        return runOnce(() -> setUptakeSpeed(kUptakeSpeed));
+    }
+
+    /** Stops the uptake. */
+    public Command stopCommand() {
+        return runOnce(this::stop);
+    }
+
+    /** Runs the uptake at a custom speed. */
+    public Command runAtSpeed(double speed) {
+        return runOnce(() -> setUptakeSpeed(speed));
+    }
+
+    /** Reverses the uptake for unjamming. */
+    public Command reverseCommand() {
+        return runOnce(() -> setUptakeSpeed(-kUptakeSpeed));
+    }
 }
