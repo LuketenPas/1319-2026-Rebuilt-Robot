@@ -68,6 +68,11 @@ public class LimelightSubsystem extends SubsystemBase {
         return LimelightHelpers.getTY(kLimelightName);
     }
 
+    /** Gets the target area (0% to 100% of image). */
+    public double getTargetArea() {
+        return LimelightHelpers.getTA(kLimelightName);
+    }
+
     /** Returns true if the Limelight has a valid target lock. */
     public boolean hasValidTarget() {
         return LimelightHelpers.getTV(kLimelightName);
