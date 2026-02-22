@@ -25,10 +25,7 @@ public class ClimberSubsystem extends SubsystemBase {
     // This method will be called once per scheduler run
   }
 
-  public Command ClimberToggle(ClimberSubsystem climberSubsystem){
-    return Commands.runOnce(() -> climberDoubleSolenoid.toggle(), climberSubsystem);
+  public Command toggleCommand() {
+    return Commands.runOnce(() -> climberDoubleSolenoid.toggle(), this);
   }
-
-
-
 }
