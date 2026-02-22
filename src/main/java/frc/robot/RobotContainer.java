@@ -9,6 +9,7 @@ import java.util.Set;
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.commands.FollowPathCommand;
 
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -21,11 +22,11 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import frc.robot.commands.AprilTagAlignCommand;
 import frc.robot.generated.TunerConstants;
+import frc.robot.subsystems.ClimberSubsystem;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.limelight.LimelightSubsystem;
 import frc.robot.subsystems.shooter.FlyWheelSubsystem;
 import frc.robot.subsystems.shooter.UptakeSubsystem;
-import frc.robot.subsystems.ClimberSubsystem;
 
 public class RobotContainer {
     // Max speeds
@@ -71,6 +72,38 @@ public class RobotContainer {
 
     public RobotContainer() {
         limelightSubsystem.setDrivetrain(drivetrain);
+
+        NamedCommands.registerCommand("ShootClose",
+            Commands.sequence(
+                flyWheelSubsystem.shootAtVelocity(42.5),
+                flyWheelSubsystem.waitUntilAtSpeed(),
+                Commands.deadline(
+                    Commands.waitSeconds(5.0),
+                    uptakeSubsystem.runCommand()
+                ),
+                Commands.parallel(
+                    flyWheelSubsystem.stopCommand(),
+                    uptakeSubsystem.stopCommand()
+                )
+            )
+        );
+        NamedCommands.registerCommand("ShootFar",
+            Commands.sequence(
+                flyWheelSubsystem.shootAtVelocity(65.0),
+                flyWheelSubsystem.waitUntilAtSpeed(),
+                Commands.deadline(
+                    Commands.waitSeconds(5.0),
+                    uptakeSubsystem.runCommand()
+                ),
+                Commands.parallel(
+                    flyWheelSubsystem.stopCommand(),
+                    uptakeSubsystem.stopCommand()
+                )
+            )
+        );
+        NamedCommands.registerCommand("Climb",
+            climberSubsystem.toggleCommand()
+        );
 
         m_autoChooser = AutoBuilder.buildAutoChooser();
         SmartDashboard.putData("Auto Mode", m_autoChooser);
@@ -165,39 +198,7 @@ public class RobotContainer {
         );
 
         m_operatorController.start()
-            .onTrue(climberSubsystem.ClimberToggle(climberSubsystem));
-
-        // Operator left trigger — auto-align and shoot
-        m_operatorController.leftTrigger().whileTrue(
-            Commands.parallel(
-                new AprilTagAlignCommand(
-                    drivetrain,
-                    limelightSubsystem,
-                    m_driverController::getLeftY,
-                    m_driverController::getLeftX,
-                    kMaxSpeed,
-                    kMaxAngularRate,
-                    () -> m_speedMultiplier[0]
-                ),
-                Commands.sequence(
-                    Commands.waitSeconds(0.3),
-                    Commands.defer(() -> {
-                        double distance = limelightSubsystem.getDistanceToTargetSafe();
-                        return flyWheelSubsystem.shootAtDistance(distance);
-                    }, Set.of(flyWheelSubsystem)),
-                    flyWheelSubsystem.waitUntilAtSpeed(),
-                    Commands.waitUntil(() ->
-                        Math.abs(limelightSubsystem.getHorizontalOffset()) < 2.0
-                    ),
-                    uptakeSubsystem.runCommand()
-                )
-            )
-        ).onFalse(
-            Commands.parallel(
-                flyWheelSubsystem.stopCommand(),
-                uptakeSubsystem.stopCommand()
-            )
-        );
+            .onTrue(climberSubsystem.toggleCommand());
     }
 
     public Command getAutonomousCommand() {
