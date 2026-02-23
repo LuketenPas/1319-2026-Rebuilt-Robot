@@ -17,7 +17,7 @@ public class ClimberSubsystem extends SubsystemBase {
   /** Creates a new ClimberSubsystem. */
   public ClimberSubsystem() {
     climberDoubleSolenoid = new DoubleSolenoid(PneumaticsModuleType.REVPH, 0, 1);
-    climberDoubleSolenoid.set(Value.kReverse);
+    climberDoubleSolenoid.set(Value.kForward);
   }
 
   @Override
