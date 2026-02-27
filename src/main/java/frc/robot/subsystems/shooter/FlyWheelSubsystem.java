@@ -40,6 +40,10 @@ public class FlyWheelSubsystem extends SubsystemBase {
     private static final double kV = 0.133;
     private static final double kA = 0.01;
 
+    // Current limits — protects motors from damage under stall or jam conditions
+    private static final double kStatorCurrentLimit = 80.0;
+    private static final double kSupplyCurrentLimit = 60.0;
+
     // Linear velocity model coefficients: v = kVelocityIntercept + kVelocitySlope * d
     private static final double kVelocityIntercept = 32.165;
     private static final double kVelocitySlope     = 10.599;
@@ -75,7 +79,22 @@ public class FlyWheelSubsystem extends SubsystemBase {
 
         config.MotorOutput.NeutralMode = NeutralModeValue.Coast;
 
+        config.CurrentLimits.StatorCurrentLimit       = kStatorCurrentLimit;
+        config.CurrentLimits.StatorCurrentLimitEnable = true;
+        config.CurrentLimits.SupplyCurrentLimit       = kSupplyCurrentLimit;
+        config.CurrentLimits.SupplyCurrentLimitEnable = true;
+
         m_shooterMotor1.getConfigurator().apply(config);
+
+        // Motor 2 follows motor 1 — apply current limits independently
+        TalonFXConfiguration motor2Config = new TalonFXConfiguration();
+        motor2Config.CurrentLimits.StatorCurrentLimit       = kStatorCurrentLimit;
+        motor2Config.CurrentLimits.StatorCurrentLimitEnable = true;
+        motor2Config.CurrentLimits.SupplyCurrentLimit       = kSupplyCurrentLimit;
+        motor2Config.CurrentLimits.SupplyCurrentLimitEnable = true;
+        motor2Config.MotorOutput.NeutralMode = NeutralModeValue.Coast;
+
+        m_shooterMotor2.getConfigurator().apply(motor2Config);
         m_shooterMotor2.setControl(new Follower(kMotor1Id, MotorAlignmentValue.Opposed));
     }
 
