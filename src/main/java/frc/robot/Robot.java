@@ -47,6 +47,12 @@ public class Robot extends TimedRobot {
         m_robotContainer.limelightSubsystem.setAutoMode(true);
         m_robotContainer.limelightSubsystem.setVisionUpdatesEnabled(true);
 
+        // Attempt to snap the starting pose to vision before the auto runs.
+        // resetPoseFromVision() seeds the Limelight orientation manually and requires
+        // at least 2 tags within 3.5 m. Result is logged to SmartDashboard.
+        // If it fails the robot falls back to the pose PathPlanner sets at auto start.
+        m_robotContainer.limelightSubsystem.resetPoseFromVision();
+
         m_autonomousCommand = m_robotContainer.getAutonomousCommand();
         if (m_autonomousCommand != null) {
             m_autonomousCommand.schedule();
