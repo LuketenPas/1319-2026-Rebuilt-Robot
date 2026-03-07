@@ -16,8 +16,8 @@ public class IntakeSubsystem extends SubsystemBase {
     private final TalonFX m_intakeMotor;
     private final DoubleSolenoid m_intakeSolenoid;
 
-    private static final int    kIntakeMotorId      = 11;
-    private static final String kCanBus             = "canivore";
+    private static final int    kIntakeMotorId      = 9;
+    private static final String kCanBus             = "";
     private static final double kIntakeSpeed        = 1.0;
 
     // Pneumatic channel IDs on the REV PH

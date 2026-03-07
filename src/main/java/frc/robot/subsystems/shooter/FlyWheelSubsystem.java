@@ -25,12 +25,14 @@ public class FlyWheelSubsystem extends SubsystemBase {
     // Hardware
     private final TalonFX m_shooterMotor1;
     private final TalonFX m_shooterMotor2;
+    private final TalonFX m_shooterMotor3;
     private final VelocityVoltage m_velocityRequest;
 
     // CAN IDs
     private static final int    kMotor1Id = 11;
     private static final int    kMotor2Id = 12;
-    private static final String kCanBus   = "canivore";
+    private static final int    kMotor3Id = 13;
+    private static final String kCanBus   = "";
 
     // PID gains — kP is constant across all velocities
     private static final double kP = 0.5;
@@ -62,6 +64,7 @@ public class FlyWheelSubsystem extends SubsystemBase {
     public FlyWheelSubsystem() {
         m_shooterMotor1 = new TalonFX(kMotor1Id, kCanBus);
         m_shooterMotor2 = new TalonFX(kMotor2Id, kCanBus);
+        m_shooterMotor3 = new TalonFX(kMotor3Id, kCanBus);
         m_velocityRequest = new VelocityVoltage(0).withSlot(0);
 
         configureMotors();
@@ -96,6 +99,17 @@ public class FlyWheelSubsystem extends SubsystemBase {
 
         m_shooterMotor2.getConfigurator().apply(motor2Config);
         m_shooterMotor2.setControl(new Follower(kMotor1Id, MotorAlignmentValue.Opposed));
+
+        // Motor 3 follows motor 1 — same configuration as motor 2
+        TalonFXConfiguration motor3Config = new TalonFXConfiguration();
+        motor3Config.CurrentLimits.StatorCurrentLimit       = kStatorCurrentLimit;
+        motor3Config.CurrentLimits.StatorCurrentLimitEnable = true;
+        motor3Config.CurrentLimits.SupplyCurrentLimit       = kSupplyCurrentLimit;
+        motor3Config.CurrentLimits.SupplyCurrentLimitEnable = true;
+        motor3Config.MotorOutput.NeutralMode = NeutralModeValue.Coast;
+
+        m_shooterMotor3.getConfigurator().apply(motor3Config);
+        m_shooterMotor3.setControl(new Follower(kMotor1Id, MotorAlignmentValue.Opposed));
     }
 
     @Override

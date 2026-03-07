@@ -27,7 +27,7 @@ import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.limelight.LimelightSubsystem;
 import frc.robot.subsystems.shooter.FlyWheelSubsystem;
 import frc.robot.subsystems.IntakeSubsystem;
-import frc.robot.subsystems.shooter.HoodSubsystem;
+
 import frc.robot.subsystems.shooter.UptakeSubsystem;
 
 public class RobotContainer {
@@ -67,7 +67,7 @@ public class RobotContainer {
     public final UptakeSubsystem         uptakeSubsystem    = new UptakeSubsystem();
     public final ClimberSubsystem        climberSubsystem   = new ClimberSubsystem();
     public final IntakeSubsystem         intakeSubsystem    = new IntakeSubsystem();
-    public final HoodSubsystem           hoodSubsystem      = new HoodSubsystem();
+
     // Telemetry
     private final Telemetry m_telemetry = new Telemetry(kMaxSpeed);
 
@@ -221,9 +221,21 @@ public class RobotContainer {
         m_operatorController.back()
             .onTrue(intakeSubsystem.toggleCommand());
 
-        // Operator D-pad up — toggle hood angle
-        m_operatorController.povUp()
-            .onTrue(hoodSubsystem.toggleCommand());
+
+
+        // Operator right bumper — fixed-speed shot (no limelight)
+        m_operatorController.rightBumper().whileTrue(
+            Commands.sequence(
+                flyWheelSubsystem.shootAtVelocity(50.0),
+                flyWheelSubsystem.waitUntilAtSpeed(),
+                uptakeSubsystem.runCommand()
+            )
+        ).onFalse(
+            Commands.parallel(
+                flyWheelSubsystem.stopCommand(),
+                uptakeSubsystem.stopCommand()
+            )
+        );
 
         m_operatorController.start()
             .onTrue(climberSubsystem.toggleCommand());

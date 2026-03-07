@@ -1,20 +1,18 @@
 package frc.robot.subsystems.shooter;
 
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.hardware.TalonFX;
-import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
-/** Controls the uptake and roller motors that feed notes into the flywheel. */
+/** Controls the single uptake motor that feeds notes into the flywheel. */
 public class UptakeSubsystem extends SubsystemBase {
     private final TalonFX m_uptakeMotor;
 
-    private static final int    kUptakeMotorId = 9;
-    private static final String kCanBus        = "canivore";
+    private static final int    kUptakeMotorId = 10;
+    private static final String kCanBus        = "";
     private static final double kUptakeSpeed   = 1.0;
 
     // Current limits — uptake is more likely to jam so limits are lower than flywheel
@@ -38,20 +36,6 @@ public class UptakeSubsystem extends SubsystemBase {
         uptakeConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
 
         m_uptakeMotor.getConfigurator().apply(uptakeConfig);
-
-        TalonFXConfiguration rollerConfig = new TalonFXConfiguration();
-
-        rollerConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
-
-        rollerConfig.CurrentLimits.StatorCurrentLimit       = kStatorCurrentLimit;
-        rollerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-        rollerConfig.CurrentLimits.SupplyCurrentLimit       = kSupplyCurrentLimit;
-        rollerConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-
-        m_rollerMotor.getConfigurator().apply(rollerConfig);
-
-        // Roller follows uptake in the opposite direction to feed toward the shooter
-        m_rollerMotor.setControl(new Follower(kUptakeMotorId, MotorAlignmentValue.Opposed));
     }
 
     @Override
